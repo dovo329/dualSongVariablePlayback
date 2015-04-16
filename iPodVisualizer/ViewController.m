@@ -30,6 +30,11 @@
 @property (strong, nonatomic) VisualizerView *visualizer;
 @property (strong, nonatomic) VisualizerView *visualizer2;
 
+@property (nonatomic) NSTimer *updateSongPositionTimer;
+@property (nonatomic) UISlider *songPositionSlider;
+@property (nonatomic) UISlider *songLoopback1Slider;
+@property (nonatomic) UISlider *songLoopback2Slider;
+
 @end
 
 @implementation ViewController {
@@ -42,7 +47,7 @@
     [super viewDidLoad];
     [self configureBars];
     [self configureAudioSession];
-    CGRect leftVisualizerFrame = self.view.frame;
+    /*CGRect leftVisualizerFrame = self.view.frame;
     leftVisualizerFrame.size.width /= 2.0;
     CGRect rightVisualizerFrame = self.view.frame;
     rightVisualizerFrame.size.width /= 2.0;
@@ -52,15 +57,35 @@
     [_backgroundView addSubview:_visualizer];
     self.visualizer2 = [[VisualizerView alloc] initWithFrame:rightVisualizerFrame];
     [_visualizer2 setAutoresizingMask:UIViewAutoresizingFlexibleHeight | UIViewAutoresizingFlexibleWidth];
-    [_backgroundView addSubview:_visualizer2];
+    [_backgroundView addSubview:_visualizer2];*/
     [self configureAudioPlayer];
     [self createPlaybackSpeedSlider];
     [self createPlaybackSpeedSlider2];
     [self createMixerSlider];
+    [self createSongPositionSlider];
+    [self createSongLoopback1Slider];
+    [self createSongLoopback2Slider];
+    
+    self.updateSongPositionTimer = [NSTimer scheduledTimerWithTimeInterval:0.5
+                                                      target:self
+                                                    selector:@selector(updateSongPositionTimerHandler)
+                                                    userInfo:nil
+                                                     repeats:YES];
 }
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
+    self.songPositionSlider.maximumValue = self.audioPlayer.duration;
+    NSLog(@"self.audioPlayer.duration=%f", self.audioPlayer.duration);
+
+    self.songLoopback1Slider.minimumValue = 0.0;
+    self.songLoopback1Slider.maximumValue = self.audioPlayer.duration;
+    self.songLoopback1Slider.value = 0.0;
+    
+    self.songLoopback2Slider.minimumValue = 0.0;
+    self.songLoopback2Slider.maximumValue = self.audioPlayer.duration;
+    self.songLoopback2Slider.value = self.audioPlayer.duration;
+    
     [self toggleBars];
 }
 
@@ -370,7 +395,7 @@
     CGRect screenRect = [UIScreen mainScreen].bounds;
     CGRect frame = screenRect;
     frame.size.height /= 8.0;
-    frame.origin.y += screenRect.size.height*(3.0/8.0);
+    frame.origin.y += screenRect.size.height*(2.0/8.0);
     UISlider *slider = [[UISlider alloc] initWithFrame:frame];
     
     [slider setMinimumTrackImage:[UIImage imageNamed:@"slider_minimum.png"] forState:UIControlStateNormal];
@@ -392,7 +417,7 @@
 -(void)mixerSliderAction:(id)sender
 {
     UISlider *slider = (UISlider*)sender;
-    NSLog(@"mixer slider value = %f", slider.value);
+    //NSLog(@"mixer slider value = %f", slider.value);
     self.audioPlayer.volume = 1.0-slider.value;
     self.audioPlayer2.volume = slider.value;
 }
@@ -402,7 +427,7 @@
     CGRect screenRect = [UIScreen mainScreen].bounds;
     CGRect frame = screenRect;
     frame.size.height /= 8.0;
-    frame.origin.y += screenRect.size.height*(5.0/8.0);
+    frame.origin.y += screenRect.size.height*(3.0/8.0);
     UISlider *slider = [[UISlider alloc] initWithFrame:frame];
     
     [slider setMinimumTrackImage:[UIImage imageNamed:@"slider_minimum.png"] forState:UIControlStateNormal];
@@ -418,6 +443,107 @@
     slider.value = 0.5;
     
     [self.view addSubview:slider];
+}
+
+-(void)songPositionSliderAction:(id)sender
+{
+    UISlider *slider = (UISlider*)sender;
+    NSLog(@"song position slider value = %f", slider.value);
+    self.audioPlayer.currentTime = slider.value;
+}
+
+- (void)updateSongPositionTimerHandler
+{
+    //NSLog(@"update currentTime=%f duration=%f", self.audioPlayer.currentTime, self.audioPlayer.duration);
+    self.songPositionSlider.value = self.audioPlayer.currentTime;
+    if (self.songPositionSlider.value > self.songLoopback2Slider.value) {
+        self.songPositionSlider.value = self.songLoopback1Slider.value;
+        self.audioPlayer.currentTime = self.songLoopback1Slider.value;
+    }
+}
+
+-(IBAction)createSongPositionSlider
+{
+    CGRect screenRect = [UIScreen mainScreen].bounds;
+    CGRect frame = screenRect;
+    frame.size.height /= 8.0;
+    frame.origin.y += screenRect.size.height*(4.0/8.0);
+    self.songPositionSlider = [[UISlider alloc] initWithFrame:frame];
+    
+    [self.songPositionSlider setMinimumTrackImage:[UIImage imageNamed:@"slider_minimum.png"] forState:UIControlStateNormal];
+    [self.songPositionSlider setMaximumTrackImage:[UIImage imageNamed:@"slider_maximum.png"] forState:UIControlStateNormal];
+    [self.songPositionSlider setThumbImage:[UIImage imageNamed:@"slider_tab.png"] forState:UIControlStateNormal];
+    [self.songPositionSlider setThumbImage:[UIImage imageNamed:@"slider_tab.png"] forState:UIControlStateHighlighted];
+    
+    [self.songPositionSlider addTarget:self action:@selector(songPositionSliderAction:) forControlEvents:UIControlEventValueChanged];
+    [self.songPositionSlider setBackgroundColor:[UIColor whiteColor]];
+    self.songPositionSlider.minimumValue = 0.0;
+    self.songPositionSlider.maximumValue = self.audioPlayer.duration;
+    NSLog(@"self.audioPlayer.duration=%f", self.audioPlayer.duration);
+    self.songPositionSlider.continuous = YES;
+    self.songPositionSlider.value = 0.0;
+    
+    [self.view addSubview:self.songPositionSlider];
+}
+
+-(void)songLoopback1SliderAction:(id)sender
+{
+    UISlider *slider = (UISlider*)sender;
+    NSLog(@"song loopback slider1 value = %f", slider.value);
+}
+
+-(IBAction)createSongLoopback1Slider
+{
+    CGRect screenRect = [UIScreen mainScreen].bounds;
+    CGRect frame = screenRect;
+    frame.size.height /= 8.0;
+    frame.origin.y += screenRect.size.height*(5.0/8.0);
+    self.songLoopback1Slider = [[UISlider alloc] initWithFrame:frame];
+    
+    [self.songLoopback1Slider setMinimumTrackImage:[UIImage imageNamed:@"slider_minimum.png"] forState:UIControlStateNormal];
+    [self.songLoopback1Slider setMaximumTrackImage:[UIImage imageNamed:@"slider_maximum.png"] forState:UIControlStateNormal];
+    [self.songLoopback1Slider setThumbImage:[UIImage imageNamed:@"slider_tab.png"] forState:UIControlStateNormal];
+    [self.songLoopback1Slider setThumbImage:[UIImage imageNamed:@"slider_tab.png"] forState:UIControlStateHighlighted];
+    
+    [self.songLoopback1Slider addTarget:self action:@selector(songLoopback1SliderAction:) forControlEvents:UIControlEventValueChanged];
+    [self.songLoopback1Slider setBackgroundColor:[UIColor whiteColor]];
+
+    self.songLoopback1Slider.value = 0.0;
+    self.songLoopback1Slider.continuous = YES;
+    self.songLoopback1Slider.minimumValue = 0.0;
+    self.songLoopback1Slider.maximumValue = self.audioPlayer.duration;
+    
+    [self.view addSubview:self.songLoopback1Slider];
+}
+
+-(void)songLoopback2SliderAction:(id)sender
+{
+    UISlider *slider = (UISlider*)sender;
+    NSLog(@"song loopback slider2 value = %f", slider.value);
+}
+
+-(IBAction)createSongLoopback2Slider
+{
+    CGRect screenRect = [UIScreen mainScreen].bounds;
+    CGRect frame = screenRect;
+    frame.size.height /= 8.0;
+    frame.origin.y += screenRect.size.height*(6.0/8.0);
+    self.songLoopback2Slider = [[UISlider alloc] initWithFrame:frame];
+    
+    [self.songLoopback2Slider setMinimumTrackImage:[UIImage imageNamed:@"slider_minimum.png"] forState:UIControlStateNormal];
+    [self.songLoopback2Slider setMaximumTrackImage:[UIImage imageNamed:@"slider_maximum.png"] forState:UIControlStateNormal];
+    [self.songLoopback2Slider setThumbImage:[UIImage imageNamed:@"slider_tab.png"] forState:UIControlStateNormal];
+    [self.songLoopback2Slider setThumbImage:[UIImage imageNamed:@"slider_tab.png"] forState:UIControlStateHighlighted];
+    
+    [self.songLoopback2Slider addTarget:self action:@selector(songLoopback2SliderAction:) forControlEvents:UIControlEventValueChanged];
+    [self.songLoopback2Slider setBackgroundColor:[UIColor whiteColor]];
+
+    self.songLoopback2Slider.value = self.audioPlayer.duration;
+    self.songLoopback2Slider.continuous = YES;
+    self.songLoopback2Slider.minimumValue = 0.0;
+    self.songLoopback2Slider.maximumValue = self.audioPlayer.duration;
+    
+    [self.view addSubview:self.songLoopback2Slider];
 }
 
 @end
